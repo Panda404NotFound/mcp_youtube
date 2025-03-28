@@ -1,0 +1,10 @@
+.env
+lib/
+include/
+bin/
+share/
+chroma_db/
+pyvenv.cfg
+__pycache__/
+help.txt
+data/*
