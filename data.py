@@ -100,7 +100,7 @@ def process_file(file_path):
         file_name_without_ext = os.path.splitext(file_name)[0]
         
         word_count = count_words(content)
-        print(f"Файл '{file_name}' содержит {word_count} слов")
+        # print(f"Файл '{file_name}' содержит {word_count} слов")
         
         return {
             'content': content,
@@ -128,8 +128,13 @@ def create_collection(name="nutrition_tips"):
         return MockCollection(name)
     
     try:
-        # Инициализация клиента Chroma
-        client = chromadb.Client()
+        # Создаем директорию для хранения базы данных, если она не существует
+        chroma_db_path = os.getenv('CHROMA_DB_PATH', './chroma_db')
+        os.makedirs(chroma_db_path, exist_ok=True)
+        
+        # Инициализация клиента Chroma с постоянным хранилищем
+        client = chromadb.PersistentClient(path=chroma_db_path)
+        print(f"Подключение к ChromaDB в директории: {chroma_db_path}")
         
         # Попытка использовать SentenceTransformer
         try:
@@ -504,10 +509,9 @@ if __name__ == "__main__":
     DATA_FOLDER = os.getenv('DATA_FOLDER', './data')
     SUPPORTED_FORMATS = os.getenv('SUPPORTED_FORMATS', 'txt').split(',')
     
-    # Парсим аргументы командной строки
+    # Парсим аргументы командной строки (упрощенный вариант)
     parser = argparse.ArgumentParser(description="Обработка файлов и создание векторной базы данных")
-    parser.add_argument('--file', type=str, help='Имя файла для обработки')
-    parser.add_argument('--all', action='store_true', help='Обработать все файлы с учетом порога слов')
+    parser.add_argument('--file', type=str, help='Имя файла для обработки (если не указано, обрабатываются все файлы)')
     parser.add_argument('--threshold', type=int, default=MIN_WORDS_THRESHOLD, 
                         help=f'Минимальный порог слов для отдельной коллекции (по умолчанию {MIN_WORDS_THRESHOLD})')
     parser.add_argument('--demo', action='store_true', help='Запустить в демонстрационном режиме без ChromaDB')
@@ -526,11 +530,17 @@ if __name__ == "__main__":
     print(f"Папка с данными: {DATA_FOLDER}")
     print(f"Поддерживаемые форматы: {SUPPORTED_FORMATS}")
     print(f"Порог слов для отдельной коллекции: {MIN_WORDS_THRESHOLD}")
+    print(f"База данных ChromaDB сохраняется в: {os.getenv('CHROMA_DB_PATH', './chroma_db')}")
     
-    if args.all:
-        print("Обрабатываем все файлы с учетом порога слов")
-        # Создаем коллекции с учетом порога слов
-        collections_data = process_all_files(DATA_FOLDER, SUPPORTED_FORMATS)
+    if args.file:
+        # Обрабатываем один файл, если указан
+        print(f"Обработка файла: {args.file}")
+        collection_result = process_one_file(DATA_FOLDER, SUPPORTED_FORMATS, target_file=args.file)
     else:
-        # Обрабатываем один файл
-        process_one_file(DATA_FOLDER, SUPPORTED_FORMATS, target_file=args.file)
+        # По умолчанию обрабатываем все файлы
+        print("Обработка всех файлов с учетом порога слов")
+        collections_data = process_all_files(DATA_FOLDER, SUPPORTED_FORMATS)
+    
+    print(f"\nОбработка завершена. Данные сохранены в векторную базу ChromaDB.")
+    print(f"Для доступа к базе данных с помощью chroma-mcp используйте директорию {os.getenv('CHROMA_DB_PATH', './chroma_db')}")
+    print(f"Пример команды: uvx chroma-mcp --client-type persistent --data-dir {os.getenv('CHROMA_DB_PATH', './chroma_db')}")
